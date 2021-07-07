@@ -42,6 +42,8 @@ from torch.quantization.ns.graph_matcher import (
 )
 from torch.quantization.ns.utils import (
     compute_sqnr,
+    compute_l2_error,
+    compute_cosine_similarity,
 )
 from torch.quantization.ns.mappings import (
     get_node_type_to_io_type_map,
@@ -777,6 +779,13 @@ class FXNumericSuiteQuantizationTestCase(QuantizationTestCase):
                     len(results) == results_len,
                     f"expected len {results_len}, got len {len(results)}")
                 self.assert_ns_compare_dict_valid(results)
+                extend_logger_results_with_comparison(
+                    results, 'a', 'b', compute_sqnr, 'sqnr')
+                extend_logger_results_with_comparison(
+                    results, 'a', 'b', compute_l2_error, 'l2_error')
+                extend_logger_results_with_comparison(
+                    results, 'a', 'b', compute_cosine_similarity,
+                    'cosine_similarity')
 
     def _test_match_activations(
         self, m, data, prepared_expected_node_occurrence=None, results_len=0,
@@ -833,6 +842,13 @@ class FXNumericSuiteQuantizationTestCase(QuantizationTestCase):
                 len(act_compare_dict) == results_len,
                 f"expected len {results_len}, got len {len(act_compare_dict)}")
             self.assert_ns_compare_dict_valid(act_compare_dict)
+            extend_logger_results_with_comparison(
+                act_compare_dict, 'a', 'b', compute_sqnr, 'sqnr')
+            extend_logger_results_with_comparison(
+                act_compare_dict, 'a', 'b', compute_l2_error, 'l2_error')
+            extend_logger_results_with_comparison(
+                act_compare_dict, 'a', 'b', compute_cosine_similarity,
+                'cosine_similarity')
             results.append(act_compare_dict)
         return results
 
@@ -889,6 +905,13 @@ class FXNumericSuiteQuantizationTestCase(QuantizationTestCase):
                     len(act_compare_dict) == results_len,
                     f"expected len {results_len}, got len {len(act_compare_dict)}")
             self.assert_ns_compare_dict_valid(act_compare_dict)
+            extend_logger_results_with_comparison(
+                act_compare_dict, 'a', 'b', compute_sqnr, 'sqnr')
+            extend_logger_results_with_comparison(
+                act_compare_dict, 'a', 'b', compute_l2_error, 'l2_error')
+            extend_logger_results_with_comparison(
+                act_compare_dict, 'a', 'b', compute_cosine_similarity,
+                'cosine_similarity')
             results.append(act_compare_dict)
         return results
 
@@ -1668,9 +1691,18 @@ class TestFXNumericSuiteCoreAPIs(FXNumericSuiteQuantizationTestCase):
         results = extract_weights('fp32', mp, 'int8', mq)
         extend_logger_results_with_comparison(
             results, 'fp32', 'int8', compute_sqnr, 'sqnr_int8_vs_fp32')
+        extend_logger_results_with_comparison(
+            results, 'fp32', 'int8', compute_l2_error, 'l2_error_int8_vs_fp32')
+        extend_logger_results_with_comparison(
+            results, 'fp32', 'int8', compute_cosine_similarity,
+            'cosine_similarity_int8_vs_fp32')
 
         for layer_name, layer_results in results.items():
             assert 'sqnr_int8_vs_fp32' in \
+                layer_results['weight']['int8'][0].keys()
+            assert 'l2_error_int8_vs_fp32' in \
+                layer_results['weight']['int8'][0].keys()
+            assert 'cosine_similarity_int8_vs_fp32' in \
                 layer_results['weight']['int8'][0].keys()
 
     @skipIfNoFBGEMM
