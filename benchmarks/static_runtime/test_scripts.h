@@ -493,3 +493,8 @@ const auto addmm_script = R"JIT(
   def forward(self, inp: Tensor, mat1: Tensor, mat2: Tensor, beta: float, alpha: float):
    return torch.addmm(inp, mat1, mat2, alpha=alpha, beta=beta).clone()
 )JIT";
+
+const auto var_cat_script = R"JIT(
+  def forward(self, inp1: Tensor, inp2: Tensor, dim: int):
+   return torch.cat([inp1, inp2], dim).clone()
+)JIT";
