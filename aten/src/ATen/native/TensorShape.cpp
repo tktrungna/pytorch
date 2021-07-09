@@ -1040,19 +1040,28 @@ Tensor reshape(const Tensor& self, IntArrayRef proposed_shape) {
     return at::_mkldnn_reshape(self, shape);
   }
 
-  auto stride =
-      at::detail::computeStride(self.sizes(), self.strides(), shape);
-    // `computeStride` returns the proper strides to use if this
-    // `reshape` can be just a view.
-    //
-    // NB: Even though we have viewable geometry and the target strides here,
-    //     we do not just call `as_strided` on `self` because the backward
-    //     for `as_strided` is not as efficient as that of `view` (since the
-    //     former is meant to handle general cases).
+  auto stride = at::detail::computeStride(self.sizes(), self.strides(), shape);
+  // `computeStride` returns the proper strides to use if this
+  // `reshape` can be just a view.
+  //
+  // NB: Even though we have viewable geometry and the target strides here,
+  //     we do not just call `as_strided` on `self` because the backward
+  //     for `as_strided` is not as efficient as that of `view` (since the
+  //     former is meant to handle general cases).
   if (stride.has_value()) {
-    return self.view(shape);
+    // Instead of delegating to .view() which repeats some of the above work
+    // directly return an alias.
+    return self._unsafe_reshape_alias(IntArrayRef(shape), IntArrayRef(stride.value()));
   }
   return at::_unsafe_view(self.clone(at::MemoryFormat::Contiguous), shape);
+}
+
+Tensor _unsafe_reshape_alias(const Tensor& self, IntArrayRef size, IntArrayRef strides) {
+  // `_unsafe_reshape_alias` is used when a `reshape` operation does not require
+  // a copy and can be done by returning a view. This helper is used to skip
+  // unnecessary/extraneous if we just call `view`, and to enable gradients to
+  // be calculated since `reshape` is only differentiable if it is a view.
+  return alias_with_sizes_and_strides(self, size, strides);
 }
 
 Tensor reshape_as(const Tensor& self, const Tensor& other) {
@@ -2152,11 +2161,13 @@ Tensor numpy_T(const Tensor &self) {
   return self.permute(transpose_dims);
 }
 
-Tensor view(const Tensor& self, IntArrayRef size) {
+Tensor view(const Tensor& self,
+            IntArrayRef size) {
+
   at::DimVector inferred_size = at::infer_size_dv(size, self.numel());
   auto stride = at::detail::computeStride(self.sizes(),
-                                          self.strides(),
-                                          inferred_size);
+                                        self.strides(),
+                                        inferred_size);
   TORCH_CHECK(stride.has_value(), "view size is "
     "not compatible with input tensor's size and stride (at least one dimension"
     " spans across two contiguous subspaces). Use .reshape(...) instead.");
